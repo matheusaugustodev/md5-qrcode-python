@@ -3,7 +3,6 @@ import requests
 from requests_oauthlib import OAuth1
 from io import BytesIO
 import hashlib
-import magic
 import cv2
 from pyzbar.pyzbar import decode
 import numpy as np
@@ -37,13 +36,22 @@ def extrair_imagens_pdf(buffer_pdf):
     
     return imagens
 
-def buscar_extensao_arquivo(buffer):
+def buscar_extensao_arquivo(blob):
     try:
-        tipo_mime = magic.from_buffer(buffer.read(), mime=True)
-        extensao = tipo_mime.split('/')[1]
-        return extensao
+        tipos_de_arquivo = {
+            b'\x89PNG\r\n\x1a\n': 'png',
+            b'\xFF\xD8\xFF\xE0': 'jpeg',
+            b'%PDF-': 'pdf',
+        }
+
+        for assinatura, tipo in tipos_de_arquivo.items():
+            if blob.startswith(assinatura):
+                return tipo
+
+        return 'Tipo de arquivo desconhecido'
+    
     except Exception as error:
-        print('Erro buscar_extensao_arquivo(): ', error)
+            print('Erro buscar_extensao_arquivo(): ', error)
 
 
 app = Flask(__name__)
@@ -86,7 +94,7 @@ def buscar_documento():
             raise Exception('arquivo corrompido')
 
     
-        extensao_arquivo = buscar_extensao_arquivo(buffer_arquivo)
+        extensao_arquivo = buscar_extensao_arquivo(response.content)
 
         if extensao_arquivo not in ['jpg', 'jpeg', 'png', 'pdf']:
             raise Exception('Formato de arquivo não aceito: ' + extensao_arquivo)
